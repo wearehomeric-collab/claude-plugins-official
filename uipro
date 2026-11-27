@@ -1,0 +1,99 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TARGET_DIR="${HOME}/.claude/skills"
+
+# Curated skills for global Claude Code installation
+SKILLS=(
+  "plugins/claude-code-setup/skills/claude-automation-recommender"
+  "plugins/claude-md-management/skills/claude-md-improver"
+  "plugins/frontend-design/skills/frontend-design"
+  "plugins/playground/skills/playground"
+)
+
+usage() {
+  cat <<'EOF'
+Usage: uipro init --ai claude --global
+
+Install curated AI skills globally to ~/.claude/skills/
+
+Skills installed:
+  claude-automation-recommender  Analyze projects and recommend Claude automations
+  claude-md-improver             Audit and improve CLAUDE.md files
+  frontend-design                Create production-grade frontend interfaces
+  playground                     Build interactive HTML playgrounds
+
+Options:
+  init              Initialize and install skills
+  --ai claude       Target AI platform (currently only "claude" is supported)
+  --global          Install to ~/.claude/skills/ (global scope)
+  --help, -h        Show this help message
+EOF
+  exit "${1:-0}"
+}
+
+# --- Argument parsing ---
+
+[[ $# -eq 0 ]] && usage 1
+
+COMMAND=""
+AI=""
+GLOBAL=false
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    init)       COMMAND="init"; shift ;;
+    --ai)       AI="${2:-}"; shift 2 ;;
+    --global)   GLOBAL=true; shift ;;
+    --help|-h)  usage 0 ;;
+    *)          echo "Error: unknown argument '$1'"; usage 1 ;;
+  esac
+done
+
+if [[ "$COMMAND" != "init" ]]; then
+  echo "Error: expected 'init' command"
+  usage 1
+fi
+
+if [[ "$AI" != "claude" ]]; then
+  echo "Error: --ai must be 'claude'"
+  usage 1
+fi
+
+if [[ "$GLOBAL" != true ]]; then
+  echo "Error: --global flag is required"
+  usage 1
+fi
+
+# --- Install skills ---
+
+mkdir -p "$TARGET_DIR"
+
+installed=0
+skipped=0
+
+for skill_path in "${SKILLS[@]}"; do
+  skill_name="$(basename "$skill_path")"
+  source="${SCRIPT_DIR}/${skill_path}"
+  dest="${TARGET_DIR}/${skill_name}"
+
+  if [[ ! -d "$source" ]]; then
+    echo "  WARN  ${skill_name} — source not found, skipping"
+    continue
+  fi
+
+  if [[ -d "$dest" ]]; then
+    echo "  skip  ${skill_name} — already installed"
+    skipped=$((skipped + 1))
+    continue
+  fi
+
+  cp -r "$source" "$dest"
+  echo "  added ${skill_name}"
+  installed=$((installed + 1))
+done
+
+echo ""
+echo "Done. ${installed} installed, ${skipped} already present."
+echo "Skills directory: ${TARGET_DIR}"
